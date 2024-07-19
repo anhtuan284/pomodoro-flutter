@@ -44,6 +44,13 @@ class _PomodoroScreenState extends State<PomodoroScreen> {
     _loadConfigurations();
   }
 
+  /// Make sure the timer is stopped
+  @override
+  void dispose() {
+    _timer?.cancel();
+    super.dispose();
+  }
+
   void _initializeNotifications() {
     // TODO: Initialize FlutterLocalNotificationsPlugin
   }
