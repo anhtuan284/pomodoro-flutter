@@ -1,14 +1,15 @@
 import 'dart:async';
+import 'package:audioplayers/audioplayers.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:pomodoro/src/theme/theme_provider.dart';
 import 'package:pomodoro/src/utils/bottom_dialog.dart';
 import 'package:pomodoro/src/utils/config_manager.dart';
-import 'package:flutter/services.dart';
+import 'package:pomodoro/src/utils/time_formater.dart';
 import 'package:pomodoro/src/widgets/duration_button.dart';
 import 'package:pomodoro/src/widgets/numeric_input_field.dart';
 import 'package:pomodoro/src/widgets/timer_circle.dart';
 import 'package:provider/provider.dart';
+import 'dart:html' as html;
 
 class PomodoroScreen extends StatefulWidget {
   const PomodoroScreen({super.key});
@@ -33,9 +34,11 @@ class _PomodoroScreenState extends State<PomodoroScreen> {
   int _completedCycles = 0;
   int _cyclesUntilLongBreak = 4;
 
-  late FlutterLocalNotificationsPlugin _flutterLocalNotificationsPlugin;
+  // late FlutterLocalNotificationsPlugin _flutterLocalNotificationsPlugin;
 
   final ConfigManager _configManager = ConfigManager();
+
+  final AudioPlayer _audioPlayer = AudioPlayer();
 
   @override
   void initState() {
@@ -48,6 +51,7 @@ class _PomodoroScreenState extends State<PomodoroScreen> {
   @override
   void dispose() {
     _timer?.cancel();
+    _audioPlayer.dispose();
     super.dispose();
   }
 
@@ -90,18 +94,19 @@ class _PomodoroScreenState extends State<PomodoroScreen> {
   void _startTimer() {
     if (_isRunning) return;
     _isRunning = true;
-    _timer = Timer.periodic(Duration(seconds: 1), (timer) {
+    _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
       setState(() {
         if (_remainingTime > 0) {
           _remainingTime--;
+          setPageTitle(_remainingTime);
         } else {
           _timer?.cancel();
           _isRunning = false;
-          _showNotification('Time\'s up!', 'Take a break !');
           _handleTimerCompletion();
         }
       });
     });
+    playSound(type: "start");
   }
 
   void _resetTimer() {
@@ -114,6 +119,8 @@ class _PomodoroScreenState extends State<PomodoroScreen> {
               ? _longBreakDuration
               : _shortBreakDuration;
     });
+    setPageTitle(_remainingTime);
+    playSound(type: "setting");
   }
 
   void _configureDurations() {
@@ -130,7 +137,7 @@ class _PomodoroScreenState extends State<PomodoroScreen> {
       context: context,
       builder: (context) {
         return AlertDialog(
-          title: Text('Configure Durations'),
+          title: const Text('Configure Durations'),
           content: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
@@ -149,7 +156,7 @@ class _PomodoroScreenState extends State<PomodoroScreen> {
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Text('Dark Mode'),
+                  const Text('Dark Mode'),
                   Switch(
                     value: _isDarkMode,
                     onChanged: (value) {
@@ -274,6 +281,8 @@ class _PomodoroScreenState extends State<PomodoroScreen> {
           message: 'Take a break.',
           type: MessageType.success,
         );
+        playSound(type: "end");
+
         _completedCycles++;
         if (_completedCycles % _cyclesUntilLongBreak == 0) {
           _isLongBreak = true;
@@ -290,6 +299,7 @@ class _PomodoroScreenState extends State<PomodoroScreen> {
         );
         _isLongBreak = false;
         _remainingTime = _pomodoroDuration;
+        playSound(type: "start");
       }
       _isWorking = !_isWorking;
       _startTimer();
@@ -317,6 +327,8 @@ class _PomodoroScreenState extends State<PomodoroScreen> {
           _isLongBreak = true;
           break;
       }
+      setPageTitle(_remainingTime);
+      playSound(type: "setting");
     });
   }
 
@@ -327,12 +339,31 @@ class _PomodoroScreenState extends State<PomodoroScreen> {
     });
   }
 
+  Future<void> playSound({String type = "default"}) async {
+    switch (type) {
+      case "start":
+        await _audioPlayer.play(AssetSource("ringtones/starttimer.mp3"));
+        break;
+      case "end":
+        await _audioPlayer.play(AssetSource("ringtones/timeout.mp3"));
+        break;
+      default:
+        await _audioPlayer.play(AssetSource("ringtones/setting.mp3"));
+        break;
+    }
+  }
+
+  void setPageTitle(int seconds) {
+    var appendTime = "${formatTime(seconds)} | Pomodoro";
+    html.document.title = appendTime;
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Theme.of(context).colorScheme.surface,
       appBar: AppBar(
-        title: Text('Pomodoro Timer'),
+        title: const Text('Pomodoro Timer'),
         backgroundColor: Theme.of(context).colorScheme.surface,
         foregroundColor: Theme.of(context).colorScheme.primary,
         elevation: 3.5,

@@ -19,7 +19,7 @@ class NumericInputField extends StatelessWidget {
         controller: controller,
         decoration: InputDecoration(
           labelText: label,
-          border: OutlineInputBorder(),
+          border: const OutlineInputBorder(),
         ),
         keyboardType: TextInputType.number,
         inputFormatters: <TextInputFormatter>[
